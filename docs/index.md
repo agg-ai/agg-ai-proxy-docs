@@ -7,7 +7,7 @@ Welcome to the AGG AI Proxy API documentation. This API provides a simplified in
 The AGG AI Proxy API is a streamlined gateway that provides:
 
 - **Simple Authentication**: Use Bearer tokens for straightforward API access
-- **Conversation AI**: Send messages and receive streaming responses from multiple AI models
+- **OpenAI-Compatible Inference**: Stateless AI inference with streaming support
 - **Tool Execution**: Execute specialized AI tools for web search, image generation, and more
 - **Full OpenAPI Support**: Interactive documentation and client generation
 
@@ -22,27 +22,29 @@ The Proxy API simplifies integration by:
 
 ## Key Features
 
-### 🤖 Multi-Model Conversations
+### 🤖 OpenAI-Compatible Inference
 
-Interact with multiple AI models simultaneously and compare their responses:
+Use the OpenAI Responses API format for stateless inference:
 
 ```python
-import requests
+from openai import OpenAI
 
-response = requests.post(
-    "https://api.your-domain.com/conversation",
-    headers={"Authorization": "Bearer your-token"},
-    data={
-        "message": json.dumps({
-            "model_ids": ["model-1-uuid", "model-2-uuid"],
-            "message": {"content": "What is quantum computing?"}
-        })
-    },
+client = OpenAI(
+    base_url="https://api.your-domain.com/v1",
+    api_key="your-token"
+)
+
+response = client.responses.create(
+    model="gpt-4",
+    messages=[
+        {"role": "user", "content": "What is quantum computing?"}
+    ],
     stream=True
 )
 
-for chunk in response.iter_content():
-    print(chunk.decode())
+for chunk in response:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")
 ```
 
 ### 🛠️ AI Tool Execution
@@ -82,21 +84,21 @@ result = response.json()
 
 - [Quickstart Guide](quickstart.md) - Get up and running in minutes
 - [Authentication](authentication.md) - Learn about API authentication
-- [Conversation API](api/conversation.md) - Send messages to AI models
+- [Responses API](api/responses.md) - OpenAI-compatible inference endpoint
 - [Tools API](api/tools.md) - Execute AI tools
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/v1/responses` | POST | Create AI responses (OpenAI-compatible) |
 | `/tools` | GET | List available tools |
 | `/tools/execute` | POST | Execute a specific tool |
-| `/conversation` | POST | Send a conversation message |
 | `/health` | GET | Check API health status |
 
 ## Getting Help
 
-- Check the [API Reference](api/conversation.md) for detailed endpoint documentation
+- Check the [API Reference](api/responses.md) for detailed endpoint documentation
 - See [Examples](examples/basic.md) for common use cases
 - Review error codes and troubleshooting in each API section
 

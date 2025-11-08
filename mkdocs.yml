@@ -35,7 +35,7 @@ nav:
       - Quickstart: quickstart.md
       - Authentication: authentication.md
   - API Reference:
-      - Conversation: api/conversation.md
+      - Responses: api/responses.md
       - Tools: api/tools.md
       - Files: api/files.md
   - Examples:
