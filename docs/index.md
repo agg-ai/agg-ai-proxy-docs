@@ -86,6 +86,7 @@ result = response.json()
 - [Authentication](authentication.md) - Learn about API authentication
 - [Responses API](api/responses.md) - OpenAI-compatible inference endpoint
 - [Tools API](api/tools.md) - Execute AI tools
+- [Responses API Examples](examples/responses-api.md) - Complete examples with OpenAI SDK
 
 ## API Endpoints
 

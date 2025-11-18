@@ -16,6 +16,14 @@ Requires Bearer token authentication:
 Authorization: Bearer YOUR_API_TOKEN
 ```
 
+## Features
+
+- **Streaming & Non-Streaming**: Real-time SSE streaming or complete responses
+- **Internal Tools**: Built-in tools (web_search, image_generation, etc.) are executed automatically
+- **Custom Tools**: Client-defined tools are returned for client-side execution
+- **Structured Outputs**: Enforce JSON schema compliance with strict validation
+- **System Instructions**: Control model behavior with instructions parameter
+
 ## Request Format
 
 The request body follows OpenAI's Responses API format:
@@ -23,7 +31,7 @@ The request body follows OpenAI's Responses API format:
 ```json
 {
   "model": "gpt-4",
-  "messages": [
+  "input": [
     {
       "role": "user",
       "content": "Hello, how are you?"
@@ -32,6 +40,7 @@ The request body follows OpenAI's Responses API format:
   "stream": false,
   "temperature": 0.7,
   "max_tokens": 1000,
+  "instructions": "You are a helpful assistant.",
   "tools": [
     {
       "type": "function",
@@ -50,7 +59,21 @@ The request body follows OpenAI's Responses API format:
         }
       }
     }
-  ]
+  ],
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "name": "response_format",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "answer": {"type": "string"}
+        },
+        "required": ["answer"]
+      },
+      "strict": true
+    }
+  }
 }
 ```
 
@@ -59,20 +82,59 @@ The request body follows OpenAI's Responses API format:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `model` | string | Yes | The model identifier (name, slug, or UUID) |
-| `messages` | array | Yes | Array of message objects with `role` and `content` |
+| `input` | string or array | Yes | Text string or array of message objects |
 | `stream` | boolean | No | Whether to stream the response (default: false) |
 | `temperature` | float | No | Sampling temperature (0.0 to 2.0) |
 | `max_tokens` | int | No | Maximum tokens to generate |
-| `tools` | array | No | Available tools for the model to use |
-| `tool_choice` | string/object | No | Control tool selection behavior |
+| `tools` | array | No | Available tools (internal or custom) |
+| `tool_choice` | string | No | Control tool selection: "auto", "required", "none" |
+| `instructions` | string | No | System instructions for the model |
+| `text` | object | No | Text output configuration including structured output |
 
 ### Message Format
 
-Each message must have:
+Each message in the `input` array must have:
 
-- `role`: One of `"user"`, `"assistant"`, or `"system"`
+- `role`: One of `"user"`, `"assistant"`, `"system"`, or `"developer"`
 - `content`: The message text content
 - `tool_calls`: (Optional) Array of tool calls made by the assistant
+
+### Tool Types
+
+**Internal Tools** (executed automatically):
+- `web_search`, `wikipedia_search`
+- `image_generation`, `image_edit`
+- `video_analysis`, `video_generation`
+- `audio_transcription`, `audio_tts`
+- `terminal`, `workflow_integration`
+
+**Custom Tools** (returned for client execution):
+- Any tool not in the internal list
+- Tool calls are returned in the response
+- Client must execute and provide results
+
+### Structured Output Format
+
+The `text.format` parameter enforces JSON schema compliance:
+
+```json
+{
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "name": "my_schema",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "field": {"type": "string"}
+        },
+        "required": ["field"]
+      },
+      "strict": true
+    }
+  }
+}
+```
 
 ## Response Format
 
@@ -82,23 +144,34 @@ Each message must have:
 {
   "id": "resp_abc123",
   "object": "response",
-  "created": 1234567890,
+  "created_at": 1234567890.0,
+  "status": "completed",
   "model": "gpt-4",
-  "choices": [
+  "output": [
     {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "I'm doing well, thank you for asking!"
-      },
-      "finish_reason": "stop"
+      "type": "message",
+      "id": "msg_xyz",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I'm doing well, thank you for asking!",
+          "annotations": []
+        }
+      ],
+      "tool_calls": []
     }
   ],
   "usage": {
-    "prompt_tokens": 10,
-    "completion_tokens": 15,
+    "input_tokens": 10,
+    "input_tokens_details": {"cached_tokens": 0},
+    "output_tokens": 15,
+    "output_tokens_details": {"reasoning_tokens": 0},
     "total_tokens": 25
-  }
+  },
+  "tools": [],
+  "tool_choice": "auto"
 }
 ```
 
@@ -107,15 +180,17 @@ Each message must have:
 When `stream: true`, the response is sent as Server-Sent Events (SSE):
 
 ```
-data: {"id":"resp_abc123","object":"response.stream","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"content":"I'm"},"finish_reason":null}]}
+event: response.created
+data: {"type":"response.created","response":{...}}
 
-data: {"id":"resp_abc123","object":"response.stream","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"content":" doing"},"finish_reason":null}]}
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","delta":"Hello","item_id":"msg_1"}
 
-data: {"id":"resp_abc123","object":"response.stream","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"content":" well"},"finish_reason":null}]}
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","delta":" world","item_id":"msg_1"}
 
-data: {"id":"resp_abc123","object":"response.stream","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
-
-data: [DONE]
+event: response.done
+data: {"type":"response.done","response":{...}}
 ```
 
 ## Available Tools
@@ -144,12 +219,7 @@ curl -X POST http://localhost:8081/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4",
-    "messages": [
-      {
-        "role": "user",
-        "content": "What is the capital of France?"
-      }
-    ]
+    "input": "What is the capital of France?"
   }'
 ```
 
@@ -161,17 +231,12 @@ curl -X POST http://localhost:8081/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Tell me a story"
-      }
-    ],
+    "input": "Tell me a story",
     "stream": true
   }'
 ```
 
-### Request with Tools
+### Request with Internal Tools
 
 ```bash
 curl -X POST http://localhost:8081/v1/responses \
@@ -179,26 +244,70 @@ curl -X POST http://localhost:8081/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Search for recent AI developments"
-      }
-    ],
+    "input": "Search for recent AI developments"
+  }'
+```
+
+### Request with Custom Tools
+
+```bash
+curl -X POST http://localhost:8081/v1/responses \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4",
+    "input": "Get the weather in San Francisco",
     "tools": [
       {
         "type": "function",
         "function": {
-          "name": "web_search"
+          "name": "get_weather",
+          "description": "Get current weather",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "location": {"type": "string"}
+            },
+            "required": ["location"]
+          }
         }
       }
     ]
   }'
 ```
 
-## Python Example
+### Request with Structured Output
+
+```bash
+curl -X POST http://localhost:8081/v1/responses \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4",
+    "input": "Extract the title and author from: The Great Gatsby by F. Scott Fitzgerald",
+    "text": {
+      "format": {
+        "type": "json_schema",
+        "name": "book_info",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {"type": "string"},
+            "author": {"type": "string"}
+          },
+          "required": ["title", "author"]
+        },
+        "strict": true
+      }
+    }
+  }'
+```
+
+## Python Examples
 
 Using the OpenAI Python client:
+
+### Basic Usage
 
 ```python
 from openai import OpenAI
@@ -211,24 +320,71 @@ client = OpenAI(
 # Non-streaming
 response = client.responses.create(
     model="gpt-4",
-    messages=[
-        {"role": "user", "content": "Hello!"}
-    ]
+    input="What is quantum computing?"
 )
-print(response.choices[0].message.content)
+print(response.output_text)
 
 # Streaming
 stream = client.responses.create(
     model="gpt-4",
-    messages=[
-        {"role": "user", "content": "Tell me a story"}
-    ],
+    input="Tell me a story",
     stream=True
 )
 
-for chunk in stream:
-    if chunk.choices[0].delta.content:
-        print(chunk.choices[0].delta.content, end="")
+for event in stream:
+    if event.type == "response.output_text.delta":
+        print(event.delta, end="", flush=True)
+```
+
+### Custom Tools
+
+```python
+response = client.responses.create(
+    model="gpt-4",
+    input="What's the weather in Tokyo?",
+    tools=[
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get weather for a location",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string"}
+                    },
+                    "required": ["location"]
+                }
+            }
+        }
+    ]
+)
+
+# Check for tool calls
+if response.output[0].tool_calls:
+    for tool_call in response.output[0].tool_calls:
+        print(f"Tool: {tool_call.function.name}")
+        print(f"Args: {tool_call.function.arguments}")
+```
+
+### Structured Output
+
+```python
+from pydantic import BaseModel
+
+class BookInfo(BaseModel):
+    title: str
+    author: str
+    year: int
+
+response = client.responses.parse(
+    model="gpt-4",
+    input="Extract info: '1984 by George Orwell, published in 1949'",
+    text_format=BookInfo
+)
+
+book = response.output_parsed
+print(f"{book.title} by {book.author} ({book.year})")
 ```
 
 ## Error Handling

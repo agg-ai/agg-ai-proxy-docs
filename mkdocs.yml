@@ -39,6 +39,7 @@ nav:
       - Tools: api/tools.md
       - Files: api/files.md
   - Examples:
+      - Responses API (OpenAI SDK): examples/responses-api.md
       - Basic Usage: examples/basic.md
       - Tool Execution: examples/tools.md
 
