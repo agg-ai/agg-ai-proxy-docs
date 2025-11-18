@@ -616,7 +616,7 @@ Validate arguments against the tool schema before making API calls to catch erro
 
 ## Next Steps
 
-- Learn about the [Conversation API](conversation.md)
+- Learn about the [Responses API](responses.md)
 - See [Tool Execution Examples](../examples/tools.md)
 - Check [Authentication](../authentication.md) best practices
 

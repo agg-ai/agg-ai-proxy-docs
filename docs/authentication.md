@@ -155,6 +155,6 @@ curl -X GET https://api.your-domain.com/tools \
 ## Next Steps
 
 - Start with the [Quickstart Guide](quickstart.md)
-- Learn about the [Conversation API](api/conversation.md)
+- Learn about the [Responses API](api/responses.md)
 - Explore [Tool Execution](api/tools.md)
 

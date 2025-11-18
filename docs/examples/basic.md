@@ -405,6 +405,6 @@ Proper error handling for API calls:
 ## Next Steps
 
 - Learn about [Tool Execution](tools.md)
-- Check out the [Conversation API](../api/conversation.md) reference
+- Check out the [Responses API](../api/responses.md) reference
 - Review [Authentication](../authentication.md) best practices
 

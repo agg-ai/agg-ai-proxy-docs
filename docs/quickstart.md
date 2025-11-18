@@ -168,7 +168,7 @@ curl -X POST https://api.your-domain.com/conversation \
 ## Next Steps
 
 - Learn about [Authentication](authentication.md) best practices
-- Explore the [Conversation API](api/conversation.md) in detail
+- Explore the [Responses API](api/responses.md) in detail
 - Check out [Tools API](api/tools.md) for all available tools
 - See more [Examples](examples/basic.md)
 
